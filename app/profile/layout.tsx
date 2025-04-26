@@ -1,0 +1,105 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { LogOut, Menu, Moon, Settings, Sun, User } from "lucide-react";
+import Link from "next/link";
+import { useTheme } from "next-themes";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { usePathname } from "next/navigation";
+
+export default function ProfileLayout({ children }: { children: React.ReactNode }) {
+
+    const { theme, setTheme } = useTheme();
+    const isMobile = useIsMobile();
+    const pathname = usePathname();
+
+    const routes = [
+        {
+            label: "Dashboard",
+            href: "/profile/dashboard",
+            tooltip: "Visualize de uma forma geral o que está acontecendo na sua empresa",
+        },
+        {
+            label: "Membros",
+            href: "/profile/members",
+            tooltip: "Visualize e gerencie todos os membros da sua empresa",
+        },
+        {
+            label: "Pagamentos",
+            href: "/profile/payments",
+            tooltip: "Visualize e gerencie todos os pagamentos da sua empresa",
+        },
+    ]
+
+    return (
+        <div className="flex flex-col items-center w-screen h-screen">
+            <div className="flex items-center justify-between w-full p-2 border-b absolute top-0 left-0 backdrop-blur-[3px]">
+                {isMobile ? (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline">
+                                <Menu className="w-4 h-4" />
+                                {routes.find((route) => route.href === pathname)?.label}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            {routes.map((route) => (
+                                <DropdownMenuItem key={route.href}>
+                                    <Link href={route.href}>{route.label}</Link>
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        {routes.map((route) => (
+                            <Tooltip key={route.href} delayDuration={1000}>
+                                <TooltipTrigger asChild>
+                                    <Link href={route.href}>
+                                        <Button variant="ghost" className="font-semibold">{route.label}</Button>
+                                    </Link>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>{route.tooltip}</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        ))}
+                    </div>
+                )}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline">
+                            <User className="w-4 h-4" />
+                            {isMobile ? (
+                                <span className="hidden">Guilherme Müller</span>
+                            ) : (
+                                "Guilherme Müller"
+                            )}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                            {theme === "dark" ? "Modo Claro" : "Modo Escuro"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href="/profile/settings">
+                                <Settings className="w-4 h-4" />
+                                Configurações
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                            <LogOut className="w-4 h-4" />
+                            Sair
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+            <main className="flex flex-col items-center w-full h-full mt-12">
+                {children}
+            </main>
+        </div>
+    );
+}
