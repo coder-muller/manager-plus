@@ -11,6 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { useRouter } from "next/navigation";
+import { sendPost } from "@/lib/fetchFunctions";
+import { toast } from "sonner";
+import Cookies from "js-cookie";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Email inválido" }),
@@ -20,7 +24,7 @@ const formSchema = z.object({
 export default function Home() {
 
   const [isLoading, setIsLoading] = useState(false);
-
+  const router = useRouter();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -29,14 +33,45 @@ export default function Home() {
     },
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true);
 
-    setTimeout(() => {
-      console.log(data);
-      setIsLoading(false);
-    }, 2000);
+    try {
+      const response = await sendPost<{ token: string, id: string, name: string, email: string }, z.infer<typeof formSchema>>("/login", data);
 
+      Cookies.set("serverToken", response.token, {
+        expires: 7,
+        path: "/",
+        sameSite: "strict",
+        secure: process.env.NODE_ENV === "production",
+      });
+      Cookies.set("userId", response.id, {
+        expires: 7,
+        path: "/",
+        sameSite: "strict",
+        secure: process.env.NODE_ENV === "production",
+      });
+      Cookies.set("userName", response.name, {
+        expires: 7,
+        path: "/",
+        sameSite: "strict",
+        secure: process.env.NODE_ENV === "production",
+      });
+      Cookies.set("userEmail", response.email, {
+        path: "/",
+        expires: 7,
+        sameSite: "strict",
+        secure: process.env.NODE_ENV === "production",
+      });
+
+      toast.success("Login realizado com sucesso");
+      router.push("/profile/members");
+    } catch (error) {
+      console.error(error);
+      toast.error("Credenciais inválidas");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -63,7 +98,7 @@ export default function Home() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" {...field} />
+                        <Input type="email" placeholder="exemplo@email.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -76,7 +111,7 @@ export default function Home() {
                     <FormItem>
                       <FormLabel>Senha</FormLabel>
                       <FormControl>
-                        <Input type="password" {...field} />
+                        <Input type="password" placeholder="********" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
