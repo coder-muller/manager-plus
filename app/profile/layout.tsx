@@ -11,6 +11,9 @@ import { usePathname } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import Cookies from "js-cookie";
+import { useRouter } from "next/navigation";
+
 export default function ProfileLayout({ children }: { children: React.ReactNode }) {
 
     const { theme, setTheme } = useTheme();
@@ -19,7 +22,7 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
     const [devEmail, setDevEmail] = useState<string>("");
     const [userEmail, setUserEmail] = useState<string>("");
     const [userName, setUserName] = useState<string>("");
-
+    const router = useRouter();
     const routes = [
         {
             icon: <LayoutDashboard className="w-4 h-4" />,
@@ -45,11 +48,20 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
         const email = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
         if (!email) {
             toast.error("Não foi possível encontrar o email do administrador. Por favor, contate o suporte.");
+            return;
         }
-        setDevEmail(email || "");
-        setUserEmail("guilhermemullerxx@gmail.com");
-        setUserName("Guilherme Müller");
+        setDevEmail(email);
+        setUserEmail(Cookies.get("userEmail") || "");
+        setUserName(Cookies.get("userName") || "");
     }, []);
+
+    const handleLogout = () => {
+        Cookies.remove("serverToken");
+        Cookies.remove("userId");
+        Cookies.remove("userName");
+        Cookies.remove("userEmail");
+        router.push("/");
+    }
 
     return (
         <div className="flex flex-col items-center w-screen h-screen overflow-y-auto">
@@ -119,7 +131,7 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
                                 Configurações
                             </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="border-t">
+                        <DropdownMenuItem className="border-t" onClick={handleLogout}>
                             <LogOut className="w-4 h-4" />
                             Sair
                         </DropdownMenuItem>

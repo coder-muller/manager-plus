@@ -138,21 +138,26 @@ const generateInvoiceSchema = z.object({
 
 type GenerateInvoiceFormValues = z.infer<typeof generateInvoiceSchema>
 
-// Add this helper function to format dates for input fields
-function formatDateForInput(date: string): string {
-  const d = new Date(date);
-  return d.toISOString().split('T')[0]; // Returns YYYY-MM-DD format
-}
+// Tipos de períodos de filtro
+type PeriodFilter = 
+  | "current_month" 
+  | "last_month" 
+  | "last_3_months" 
+  | "last_year" 
+  | "specific"
 
 export default function Payments() {
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState<PaymentStatus | "ALL">("ALL")
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState("10")
-  const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
-  const [endDate, setEndDate] = useState(new Date().toISOString())
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  
+  // Novos estados para filtro de período
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("current_month")
+  const [specificMonth, setSpecificMonth] = useState<string>(String(currentMonth))
+  const [specificYear, setSpecificYear] = useState<string>(String(currentYear))
 
   const generateInvoiceForm = useForm<GenerateInvoiceFormValues>({
     resolver: zodResolver(generateInvoiceSchema),
@@ -165,43 +170,73 @@ export default function Payments() {
 
   useEffect(() => {
     setPage(1)
-  }, [search, status, startDate, endDate, perPage])
+  }, [search, status, periodFilter, specificMonth, specificYear, perPage])
 
-  // Filter payments based on search, status, and date range
+  // Filtrar pagamentos com base nos critérios selecionados
   const filteredPayments = fakePayments.filter(payment => {
-    // Filter by member name
-    const memberNameNormalized = payment.member.name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-    const searchNormalized = search
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-    const matchesSearch = memberNameNormalized.includes(searchNormalized)
+    // Se houver busca por membro, usar apenas esse filtro
+    if (search) {
+      const memberNameNormalized = payment.member.name
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+      const searchNormalized = search
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+      const matchesSearch = memberNameNormalized.includes(searchNormalized)
+      
+      // Quando busca por membro, ignorar filtros de período e aplicar somente status
+      return matchesSearch && (status === "ALL" ? true : payment.status === status)
+    }
 
-    // Filter by status
+    // Filtro por status
     const matchesStatus = status === "ALL" ? true : payment.status === status
 
-    // Filter by date range
-    let matchesDateRange = true
-    if (startDate) {
-      const paymentDate = new Date(payment.year, payment.month - 1, 1)
-      const filterStartDate = new Date(startDate)
-      if (paymentDate < filterStartDate) {
-        matchesDateRange = false
-      }
-    }
-    if (endDate) {
-      const paymentDate = new Date(payment.year, payment.month - 1, 1)
-      const filterEndDate = new Date(endDate)
-      if (paymentDate > filterEndDate) {
-        matchesDateRange = false
-      }
+    // Filtro por período
+    let matchesPeriod = false;
+    const paymentDate = new Date(payment.year, payment.month - 1, 1);
+    const now = new Date();
+    
+    switch (periodFilter) {
+      case "current_month":
+        matchesPeriod = 
+          payment.month === currentMonth && 
+          payment.year === currentYear;
+        break;
+      
+      case "last_month":
+        const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+        const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+        matchesPeriod = 
+          payment.month === lastMonth && 
+          payment.year === lastMonthYear;
+        break;
+      
+      case "last_3_months":
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(now.getMonth() - 2); // -2 porque já estamos no mês atual
+        matchesPeriod = paymentDate >= threeMonthsAgo;
+        break;
+      
+      case "last_year":
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(now.getFullYear() - 1);
+        matchesPeriod = paymentDate >= oneYearAgo;
+        break;
+      
+      case "specific":
+        matchesPeriod = 
+          payment.month === parseInt(specificMonth) && 
+          payment.year === parseInt(specificYear);
+        break;
+      
+      default:
+        matchesPeriod = true;
     }
 
-    return matchesSearch && matchesStatus && matchesDateRange
-  })
+    return matchesStatus && matchesPeriod;
+  });
 
   // Sort payments by date (most recent first)
   const sortedPayments = [...filteredPayments].sort((a, b) => {
@@ -252,28 +287,54 @@ export default function Payments() {
                 <SelectItem value="PENDING">Pendentes</SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={formatDateForInput(startDate)}
-                onChange={(e) => {
-                  const newDate = new Date(e.target.value);
-                  setStartDate(newDate.toISOString());
-                }}
-                className="w-[150px]"
-              />
-              <span className="text-muted-foreground">a</span>
-              <Input
-                type="date"
-                value={formatDateForInput(endDate)}
-                onChange={(e) => {
-                  const newDate = new Date(e.target.value);
-                  newDate.setHours(23, 59, 59, 999);
-                  setEndDate(newDate.toISOString());
-                }}
-                className="w-[150px]"
-              />
-            </div>
+            
+            {/* Substitui os inputs de data por um sistema de filtro de período */}
+            <Select value={periodFilter} onValueChange={(value) => setPeriodFilter(value as PeriodFilter)}>
+              <SelectTrigger className={`w-[180px] ${search ? "opacity-50" : ""}`} disabled={!!search}>
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current_month">Mês atual</SelectItem>
+                <SelectItem value="last_month">Mês passado</SelectItem>
+                <SelectItem value="last_3_months">Últimos 3 meses</SelectItem>
+                <SelectItem value="last_year">Últimos 12 meses</SelectItem>
+                <SelectItem value="specific">Mês/ano específico</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {/* Selects para mês/ano específico */}
+            {periodFilter === "specific" && !search && (
+              <div className="flex gap-2 items-center">
+                <Select value={specificMonth} onValueChange={setSpecificMonth}>
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                      <SelectItem key={month} value={String(month)}>
+                        {getMonthName(month)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select value={specificYear} onValueChange={setSpecificYear}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue placeholder="Ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(
+                      { length: 5 }, 
+                      (_, i) => new Date().getFullYear() - 2 + i
+                    ).map((year) => (
+                      <SelectItem key={year} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

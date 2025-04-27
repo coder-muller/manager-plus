@@ -30,15 +30,16 @@ export interface Member {
 }
 
 export type PaymentStatus = 'PAID' | 'PENDING';
-
+export type PaymentMethod = 'PIX' | 'CASH' | 'CARD' | 'TRANSFER';
 export interface Payment {
   id: string;
   month: number;
   year: number;
   amount: number;
-  paidAt?: string | null;
   status: PaymentStatus;
+  paidAt?: string | null;
   observation?: string | null;
+  method?: PaymentMethod | null;
   createdAt: string;
   updatedAt: string;
 
